@@ -2,18 +2,11 @@
 
 function getBackendBaseUrl() {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!base) {
-    throw new Error('NEXT_PUBLIC_API_BASE_URL is not set');
-  }
-  return base.replace(/\/+$/, '');
+  return base ? base.replace(/\/+$/, '') : '';
 }
 
 function getHeadAdminKey() {
-  const key = process.env.HEAD_ADMIN_KEY;
-  if (!key) {
-    throw new Error('HEAD_ADMIN_KEY is not set');
-  }
-  return key;
+  return process.env.HEAD_ADMIN_KEY ?? '';
 }
 
 export async function GET(req: Request) {
@@ -22,15 +15,52 @@ export async function GET(req: Request) {
 
   const base = getBackendBaseUrl();
   const key = getHeadAdminKey();
+  const missing: string[] = [];
+  if (!base) missing.push('NEXT_PUBLIC_API_BASE_URL');
+  if (!key) missing.push('HEAD_ADMIN_KEY');
+  if (missing.length > 0) {
+    return NextResponse.json({ code: 'MISSING_ENV', missing }, { status: 500 });
+  }
+
   const url = `${base}/head-admin/admins?status=${encodeURIComponent(status)}`;
 
-  const res = await fetch(url, {
-    headers: {
-      'X-HEAD-ADMIN-KEY': key
-    },
-    cache: 'no-store'
-  });
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'X-HEAD-ADMIN-KEY': key
+      },
+      cache: 'no-store'
+    });
 
-  const data = await res.json().catch(() => ({}));
-  return NextResponse.json(data, { status: res.status });
+    const text = await res.text();
+    const json = (() => {
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!res.ok) {
+      return NextResponse.json(
+        {
+          code: 'UPSTREAM_ERROR',
+          upstreamStatus: res.status,
+          upstreamBodyPreview: text.slice(0, 500)
+        },
+        { status: res.status }
+      );
+    }
+
+    return NextResponse.json(json ?? { ok: true }, { status: res.status });
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        code: 'FETCH_FAILED',
+        message: err?.message ?? 'Fetch failed',
+        upstreamUrl: url
+      },
+      { status: 502 }
+    );
+  }
 }
