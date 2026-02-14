@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { requireApiAuth } from '../../../lib/api-auth';
 
 function getBackendBaseUrl() {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -10,6 +11,9 @@ function getHeadAdminKey() {
 }
 
 export async function GET(req: Request) {
+  const unauthorized = requireApiAuth();
+  if (unauthorized) return unauthorized;
+
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') ?? 'ALL';
 

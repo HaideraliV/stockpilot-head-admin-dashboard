@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { requireApiAuth } from '../../../../../lib/api-auth';
 
 function getBackendBaseUrl() {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -36,5 +37,8 @@ async function forwardPost(req: Request, adminId: string, action: string) {
 }
 
 export async function POST(req: Request, { params }: { params: { adminId: string } }) {
+  const unauthorized = requireApiAuth();
+  if (unauthorized) return unauthorized;
+
   return forwardPost(req, params.adminId, 'unsuspend');
 }
