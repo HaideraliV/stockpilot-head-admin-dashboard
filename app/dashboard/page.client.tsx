@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-const STATUS_OPTIONS = ['ALL', 'PENDING', 'APPROVED', 'DECLINED', 'SUSPENDED'] as const;
+const STATUS_OPTIONS = ['ALL', 'PENDING', 'APPROVED', 'DECLINED', 'SUSPENDED', 'SOFT_DELETED'] as const;
 
 type Status = typeof STATUS_OPTIONS[number];
 
@@ -10,7 +10,7 @@ type AdminRow = {
   adminId: string;
   businessName: string | null;
   email: string;
-  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'SUSPENDED';
+  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'SUSPENDED' | 'SOFT_DELETED';
   desiredUserLimit: number;
   approvedUserLimit: number | null;
   businessCode3: string | null;
@@ -27,6 +27,8 @@ const statusBadge = (status: AdminRow['status']) => {
       return { label: 'DECLINED', color: 'text-red-400', icon: 'X' };
     case 'SUSPENDED':
       return { label: 'SUSPENDED', color: 'text-orange-400', icon: '!' };
+    case 'SOFT_DELETED':
+      return { label: 'SOFT_DELETED', color: 'text-purple-400', icon: 'DEL' };
     default:
       return { label: 'PENDING', color: 'text-blue-300', icon: '...' };
   }
@@ -39,6 +41,7 @@ export default function DashboardPageClient() {
   const [error, setError] = useState('');
   const [limitByAdmin, setLimitByAdmin] = useState<Record<string, string>>({});
   const [busyAdmin, setBusyAdmin] = useState<string | null>(null);
+  const [confirmPermanentDeleteAdminId, setConfirmPermanentDeleteAdminId] = useState<string | null>(null);
 
   const fetchAdmins = useCallback(async () => {
     setLoading(true);
@@ -70,7 +73,10 @@ export default function DashboardPageClient() {
     window.location.href = '/login';
   };
 
-  const onAction = async (adminId: string, action: 'approve' | 'decline' | 'suspend' | 'unsuspend') => {
+  const onAction = async (
+    adminId: string,
+    action: 'approve' | 'decline' | 'suspend' | 'unsuspend' | 'recover' | 'permanent-delete'
+  ) => {
     setBusyAdmin(adminId);
     setError('');
 
@@ -187,6 +193,20 @@ export default function DashboardPageClient() {
                 Suspend
               </button>
             )}
+            <button
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
+              disabled={busyAdmin === admin.adminId}
+              onClick={() => onAction(admin.adminId, 'recover')}
+            >
+              Recover
+            </button>
+            <button
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
+              disabled={busyAdmin === admin.adminId}
+              onClick={() => setConfirmPermanentDeleteAdminId(admin.adminId)}
+            >
+              Permanent Delete
+            </button>
           </div>
         </div>
       </div>
@@ -237,6 +257,32 @@ export default function DashboardPageClient() {
           )}
         </div>
       </div>
+      {confirmPermanentDeleteAdminId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
+            <h2 className="text-xl font-semibold text-white">Are you sure?</h2>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                onClick={() => setConfirmPermanentDeleteAdminId(null)}
+              >
+                No
+              </button>
+              <button
+                className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500"
+                onClick={async () => {
+                  const adminId = confirmPermanentDeleteAdminId;
+                  setConfirmPermanentDeleteAdminId(null);
+                  if (!adminId) return;
+                  await onAction(adminId, 'permanent-delete');
+                }}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
